@@ -86,14 +86,14 @@
              * @returns {string} an OpenWeatherMap API URL for the given city with imperial units.
              */
             makeAPICallURL(city,state,country,units) {
-                return `http://api.openweathermap.org/data/2.5/weather?q=${city},${state},${country}&units=${units}&appid=25e989bd41e3e24ce13173d8126e0fd6`;
+                return `https://api.openweathermap.org/data/2.5/weather?q=${city},${state},${country}&units=${units}&appid=25e989bd41e3e24ce13173d8126e0fd6`;
             }
 
             /**
              * @returns {string} an OpenWeatherMap API URL for the 2x image of the given weather.
              */
             makeImgUrl(code) {
-                return 'http://openweathermap.org/img/wn/'+ code +'@2x.png';
+                return 'https://openweathermap.org/img/wn/'+ code +'@2x.png';
             }
 
             /**
