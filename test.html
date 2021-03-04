@@ -50,26 +50,150 @@
          */
         class Test {
             constructor() {
-                this.testResults = document.getElementsByClassName('test-results');
+                // FIXED: add [0] to get the actual element, not a list of elements
+                this.testResults = document.getElementsByClassName('test-results')[0];
             }
 
             async run() {
                 console.log(new Date().toISOString(), '[Test]', 'Running the test');
 
-                // TODO: Make the API call and handle the results
+                const apiCall = this.makeAPICallURL('Brentwood','tn','us','imperial');
+
+                // workaround for javascript having a 'this' on seemingly everything. I want to call the test instance methods.
+                // I've never touched javascript before so if this is not the idiomatic way to do this, forgive me.
+                const testInstance = this;
+                Promise.resolve(axios.get(apiCall))
+                    .then(function (results) {
+                        testInstance.setResults(results.data);
+                    })
+                    .catch(function (message) {
+                        testInstance.setError(message);
+                    });
+            }
+
+            /**
+             *
+             * see https://openweathermap.org/current#name
+             *
+             * originally I tried using only the city. I verified the results using other weather websites and the weather
+             * seemed vastly different. I realized just using "Brentwood" without state and country code caused the API
+             * to return weather for Brentwood in the UK.
+             *
+             * @param city the city string
+             * @param state the US state. should be lowercase.
+             * @param country the ISO 3166 2-character country code
+             * @param units
+             * @returns {string} an OpenWeatherMap API URL for the given city with imperial units.
+             */
+            makeAPICallURL(city,state,country,units) {
+                return `http://api.openweathermap.org/data/2.5/weather?q=${city},${state},${country}&units=${units}&appid=25e989bd41e3e24ce13173d8126e0fd6`;
+            }
+
+            /**
+             * @returns {string} an OpenWeatherMap API URL for the 2x image of the given weather.
+             */
+            makeImgUrl(code) {
+                return 'http://openweathermap.org/img/wn/'+ code +'@2x.png';
+            }
+
+            /**
+             * taken from https://www.campbellsci.com/blog/convert-wind-directions
+             * @param degrees the meteorological degree of the wind
+             * @returns {string} a string representation of the compass direction
+             */
+            getDirectionFromDegrees(degrees) {
+                const table = [
+                    'N',
+                    'NNE',
+                    'NE',
+                    'ENE',
+                    'E',
+                    'ESE',
+                    'SE',
+                    'SSE',
+                    'S',
+                    'SSW',
+                    'SW',
+                    'WSW',
+                    'W',
+                    'WNW',
+                    'NW',
+                    'NNW',
+                    'N',
+                ];
+
+                return table[Math.round((degrees % 360) / 22.5)+1];
             }
 
             setError(message) {
-                // TODO: Format the error
                 this.testResults.innerHTML = (message || '').toString();
             }
 
+            /**
+             * Format the wind message to display to the user
+             * @param results the OpenWeatherAPI JSON response
+             * @returns {string} A string summarizing the wind conditions
+             */
+            getWindMessage(results) {
+                const windElement = results['wind'];
+                const windMPH = windElement['speed'].toFixed(0);
+                const compassDirection = this.getDirectionFromDegrees(windElement['deg']);
+                const gust = windElement['gust'];
+
+                let message = compassDirection + ' Wind at ' + windMPH + 'MPH';
+                // sometimes gust is not included
+                if(gust) {
+                    const gustMPH = (gust.toFixed(0) || '').toString();
+                    message += ' | Gusts up to ' + gustMPH + 'MPH';
+                }
+                return message
+            }
+
+            /**
+             *
+             * @param results the OpenWeatherAPI JSON response
+             * @returns {string} a string summarizing the weather and temperature in Fahrenheit
+             */
+            getWeatherAndTempMessage(results) {
+                const primaryWeatherElement = results['weather'][0];
+                const weatherName = primaryWeatherElement['main'];
+                const mainElement = results['main'];
+                const temperatureF = mainElement['temp'].toFixed(0);
+                const feelsLikeTempF = mainElement['feels_like'].toFixed(0);
+
+                return weatherName + ' | ' + temperatureF + 'F | Feels Like ' + feelsLikeTempF + 'F';
+
+            }
+
+            /**
+             *
+             * @param results the openWeatherAPI JSON response
+             * @returns {string} an HTML img tag with the weather image
+             */
+            getImg(results) {
+                const primaryWeatherElement = results['weather'][0];
+                const weatherDescription = primaryWeatherElement['description'];
+                const iconCode = primaryWeatherElement['icon'];
+                return '<img src="' + this.makeImgUrl(iconCode) +'" alt="' + weatherDescription + '">' ;
+            }
+
             setResults(results) {
-                // TODO: Format the results
-                this.testResults.innerHTML = (results || '').toString();
+
+                const innerHTML = '<html><body>'
+                    + this.getImg(results) + '<br>'
+                    + this.getWeatherAndTempMessage(results) + '<br>'
+                    + this.getWindMessage(results) + '<br>'
+                    + '</body></html>';
+                this.testResults.innerHTML = (innerHTML || '').toString();
             }
         }
     </script>
+
+    <style>
+        .test-results {
+            text-align: center;
+        }
+    </style>
 
     <style>
         .button-container {
@@ -99,37 +223,38 @@
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 </head>
 <body>
-    <div class="test-results"></div>
+<div class="test-results"></div>
 
-    <div class="button-container"></div>
+<div class="button-container"></div>
 
-    <script>
-        'use strict';
+<script>
+    'use strict';
 
-        /**
-         * Creates a button for kicking off the test and adds it to the DOM.
-         *
-         * @param {HTMLElement} context  the parent element to add the button to
-         * @param {Test}        test     the test to be executed
-         * @returns {HTMLElement} the button added to the test
-         */
-        function addButtonForTest(context, test) {
-            let testButton = document.createElement('button');
+    /**
+     * Creates a button for kicking off the test and adds it to the DOM.
+     *
+     * @param {HTMLElement} context  the parent element to add the button to
+     * @param {Test}        test     the test to be executed
+     * @returns {HTMLElement} the button added to the test
+     */
+    function addButtonForTest(context, test) {
+        let testButton = document.createElement('button');
 
-            testButton.type = 'button';
-            testButton.innerText = 'Get the Nashville Weather';
-            testButton.onclick = () => test.run();
+        testButton.type = 'button';
+        // FIXED: test asks to get weather for Brentwood, TN. Button originally said "Nashville"
+        testButton.innerText = 'Get the Brentwood Weather';
+        testButton.onclick = () => test.run();
 
-            context.appendChild(testButton);
+        context.appendChild(testButton);
 
-            return testButton;
-        }
+        return testButton;
+    }
 
-        // Create the Test and add a button to the UI for running the test
-        const test = new Test();
-        const buttonContainer = document.getElementsByClassName('button-container')[0];
+    // Create the Test and add a button to the UI for running the test
+    const test = new Test();
+    const buttonContainer = document.getElementsByClassName('button-container')[0];
 
-        addButtonForTest(buttonContainer, test);
-    </script>
+    addButtonForTest(buttonContainer, test);
+</script>
 </body>
 </html>
